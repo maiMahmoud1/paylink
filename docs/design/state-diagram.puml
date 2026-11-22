@@ -1,0 +1,43 @@
+@startuml StateDiagram
+title PayLink - Payment State Diagram
+
+skinparam state {
+    BackgroundColor White
+    BorderColor Black
+}
+skinparam nodesep 50
+skinparam ranksep 50
+
+[*] --> Initiated : payment created
+
+Initiated --> FundsHeld : fraud checks pass\nand wallet has enough funds
+Initiated --> Rejected : fraud check fails\nor insufficient funds
+
+FundsHeld --> SentToBiller : request sent to biller
+
+SentToBiller --> Completed : biller confirms
+SentToBiller --> Failed : biller refuses
+SentToBiller --> Unknown : no answer within timeout\n(10 s for live billers)
+
+Unknown --> Completed : biller later confirms\n(callback, retry or settlement file)
+Unknown --> Failed : biller later refuses\nor reconciliation finds no payment
+
+Failed --> Refunded : hold released to wallet
+
+Completed --> [*]
+Rejected --> [*]
+Refunded --> [*]
+
+note right of Unknown
+    Never refunded automatically.
+    Re-queried 3 times (after 1, 5
+    and 15 minutes), then waits
+    for reconciliation.
+end note
+
+note bottom of Completed
+    Final states:
+    Completed, Rejected, Refunded
+end note
+
+@enduml
