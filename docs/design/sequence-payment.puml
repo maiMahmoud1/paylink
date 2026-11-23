@@ -1,0 +1,62 @@
+@startuml
+autonumber
+actor Customer
+participant "API / Payment Service" as PaymentSvc
+participant "Fraud & Fee Module" as FraudFee
+participant "Wallet & Ledger" as Wallet
+participant "Biller Adapter" as BillerAdp
+participant "Mock Biller" as Biller
+participant "Notification Svc" as Notif
+
+Customer -> PaymentSvc : POST /payments (idempotency_key, service_id, ref, amount, agent_id?)
+PaymentSvc -> PaymentSvc : Check idempotency_key & basic validation
+
+alt Duplicate idempotency_key
+  PaymentSvc --> Customer : Return original payment result (no double charge)
+else New payment request
+  PaymentSvc -> FraudFee : Check limits, velocity, blocked status & compute fee/commission
+  alt Fraud check fails or insufficient balance
+    PaymentSvc -> PaymentSvc : State -> Rejected
+    PaymentSvc --> Customer : Rejected (clear reason)
+  else Checks pass
+    PaymentSvc -> Wallet : Hold total_amount (create hold ledger entry)
+    PaymentSvc -> PaymentSvc : State -> FundsHeld
+    PaymentSvc -> PaymentSvc : State -> SentToBiller
+    PaymentSvc -> BillerAdp : Pay bill (payment_ref, amount)
+    BillerAdp -> Biller : Send protocol request (REST / SOAP / Async)
+
+    alt Immediate confirmation (e.g., ElectroCo)
+      Biller --> BillerAdp : Paid
+      BillerAdp --> PaymentSvc : Confirmed
+      PaymentSvc -> Wallet : Convert hold to final charge + record fee & agent commission (if agent)
+      PaymentSvc -> PaymentSvc : State -> Completed
+      PaymentSvc -> Notif : Send SMS & Push (Completed)
+      PaymentSvc --> Customer : Completed (payment_ref & receipt)
+    else Biller refuses (e.g., AquaCo error code)
+      Biller --> BillerAdp : Refused (error code)
+      BillerAdp --> PaymentSvc : Failed (failure_reason)
+      PaymentSvc -> PaymentSvc : State -> Failed
+      PaymentSvc -> Wallet : Release hold to available balance
+      PaymentSvc -> PaymentSvc : State -> Refunded
+      PaymentSvc -> Notif : Send SMS & Push (Failed + clear reason)
+      PaymentSvc --> Customer : Failed & Refunded (reason)
+    else Timeout (> 10s) or Async Accepted (TopUpNet)
+      Biller --> BillerAdp : Timeout / Accepted
+      BillerAdp --> PaymentSvc : Unknown / Pending
+      PaymentSvc -> PaymentSvc : State -> Unknown (keep hold, schedule retries 1m/5m/15m)
+      PaymentSvc --> Customer : Processing (Unknown status)
+    end
+  end
+end
+
+group Asynchronous Callback Handling (e.g., TopUpNet)
+  Biller -> PaymentSvc : Callback (payment_ref, status="success")
+  alt Payment already Completed
+    PaymentSvc -> PaymentSvc : Ignore duplicate callback & log event
+  else Payment in Unknown
+    PaymentSvc -> Wallet : Convert hold to final charge + record fee & agent commission (if agent)
+    PaymentSvc -> PaymentSvc : State -> Completed
+    PaymentSvc -> Notif : Send SMS & Push (Completed)
+  end
+end
+@enduml

@@ -1,0 +1,152 @@
+@startuml
+skinparam linetype ortho
+hide circle
+
+entity "users" as users {
+  * user_id : BIGINT <<PK>>
+  --
+  * full_name : VARCHAR(120)
+  * email : VARCHAR(150) <<UK>>
+  * phone : VARCHAR(30) <<UK>>
+  * role : VARCHAR(20)
+  * verification_level : VARCHAR(20)
+  * is_blocked : BOOLEAN
+  * blocked_until : TIMESTAMP
+  * created_at : TIMESTAMP
+}
+
+entity "agents" as agents {
+  * agent_id : BIGINT <<PK>>
+  --
+  * user_id : BIGINT <<FK, UK>>
+  * terminal_code : VARCHAR(50) <<UK>>
+  * is_active : BOOLEAN
+  * created_at : TIMESTAMP
+}
+
+entity "wallets" as wallets {
+  * wallet_id : BIGINT <<PK>>
+  --
+  * user_id : BIGINT <<FK, UK>>
+  * currency : VARCHAR(10)
+  * created_at : TIMESTAMP
+}
+
+entity "ledger_entries" as ledger_entries {
+  * entry_id : BIGINT <<PK>>
+  --
+  * wallet_id : BIGINT <<FK>>
+  * payment_id : BIGINT <<FK, NULL>>
+  * entry_type : VARCHAR(30)
+  * bucket : VARCHAR(20)
+  * amount : DECIMAL(14,2)
+  * reference_key : VARCHAR(100)
+  * description : VARCHAR(200)
+  * created_at : TIMESTAMP
+}
+
+entity "billers" as billers {
+  * biller_id : BIGINT <<PK>>
+  --
+  * code : VARCHAR(40) <<UK>>
+  * name : VARCHAR(120)
+  * category : VARCHAR(40)
+  * protocol : VARCHAR(30)
+  * is_active : BOOLEAN
+}
+
+entity "biller_services" as biller_services {
+  * service_id : BIGINT <<PK>>
+  --
+  * biller_id : BIGINT <<FK>>
+  * name : VARCHAR(120)
+  * required_field_label : VARCHAR(80)
+  * min_amount : DECIMAL(14,2)
+  * max_amount : DECIMAL(14,2)
+  * is_active : BOOLEAN
+}
+
+entity "payments" as payments {
+  * payment_id : BIGINT <<PK>>
+  --
+  * payment_ref : VARCHAR(80) <<UK>>
+  * idempotency_key : VARCHAR(120) <<UK>>
+  * wallet_id : BIGINT <<FK>>
+  * agent_id : BIGINT <<FK, NULL>>
+  * service_id : BIGINT <<FK>>
+  * subscriber_ref : VARCHAR(100)
+  * bill_amount : DECIMAL(14,2)
+  * fee_amount : DECIMAL(14,2)
+  * total_amount : DECIMAL(14,2)
+  * commission_amount : DECIMAL(14,2)
+  * state : VARCHAR(25)
+  * failure_reason : VARCHAR(255)
+  * created_at : TIMESTAMP
+  * updated_at : TIMESTAMP
+}
+
+entity "payment_attempts" as payment_attempts {
+  * attempt_id : BIGINT <<PK>>
+  --
+  * payment_id : BIGINT <<FK>>
+  * attempt_no : INT
+  * attempt_type : VARCHAR(20)
+  * status : VARCHAR(25)
+  * external_ref : VARCHAR(120)
+  * response_payload : TEXT
+  * occurred_at : TIMESTAMP
+}
+
+entity "notifications" as notifications {
+  * notification_id : BIGINT <<PK>>
+  --
+  * payment_id : BIGINT <<FK, NULL>>
+  * user_id : BIGINT <<FK>>
+  * channel : VARCHAR(20)
+  * recipient : VARCHAR(150)
+  * message : TEXT
+  * status : VARCHAR(20)
+  * retry_count : INT
+  * updated_at : TIMESTAMP
+}
+
+entity "reconciliation_items" as reconciliation_items {
+  * recon_item_id : BIGINT <<PK>>
+  --
+  * biller_id : BIGINT <<FK>>
+  * payment_ref : VARCHAR(80)
+  * settlement_batch_id : VARCHAR(80)
+  * biller_amount : DECIMAL(14,2)
+  * paylink_amount : DECIMAL(14,2)
+  * paylink_status : VARCHAR(25)
+  * mismatch_type : VARCHAR(50)
+  * status : VARCHAR(20)
+  * created_at : TIMESTAMP
+}
+
+entity "audit_logs" as audit_logs {
+  * audit_id : BIGINT <<PK>>
+  --
+  * actor_user_id : BIGINT <<FK, NULL>>
+  * action_type : VARCHAR(60)
+  * entity_type : VARCHAR(40)
+  * entity_id : VARCHAR(80)
+  * reason : VARCHAR(255)
+  * metadata_json : TEXT
+  * created_at : TIMESTAMP
+}
+
+users ||--o| agents : "operates"
+users ||--o| wallets : "has"
+agents ||--o{ payments : "processes"
+wallets ||--o{ ledger_entries : "records"
+wallets ||--o{ payments : "funds"
+billers ||--o{ biller_services : "offers"
+biller_services ||--o{ payments : "paid_via"
+payments ||--o{ ledger_entries : "generates"
+payments ||--o{ payment_attempts : "tracks"
+payments ||--o{ notifications : "triggers"
+users ||--o{ notifications : "receives"
+billers ||--o{ reconciliation_items : "settles"
+users ||--o{ audit_logs : "performs"
+@enduml
