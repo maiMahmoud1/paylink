@@ -1,0 +1,229 @@
+@startuml ClassDiagram
+title PayLink - Domain Class Diagram
+
+skinparam classAttributeIconSize 0
+skinparam nodesep 50
+skinparam ranksep 60
+
+' Rules: balances are derived from the ledger (never stored),
+' money is Decimal, every ledger entry records who/when/why.
+
+' ---------- Accounts and Wallet ----------
+class Customer {
+    +id: int
+    +name: string
+    +verificationLevel: VerificationLevel
+    +blocked: boolean
+    +blockedUntil: DateTime
+}
+
+class Agent {
+    +id: int
+    +name: string
+}
+
+class Wallet {
+    +id: int
+    +ownerType: WalletOwnerType
+    +/availableBalance(): Decimal
+    +/heldBalance(): Decimal
+}
+
+class LedgerEntry {
+    +id: int
+    +amount: Decimal
+    +type: LedgerEntryType
+    +reason: string
+    +createdBy: string
+    +createdAt: DateTime
+}
+
+class Hold {
+    +id: int
+    +amount: Decimal
+    +status: HoldStatus
+}
+
+class AuditLog {
+    +id: int
+    +actor: string
+    +action: string
+    +entity: string
+    +reason: string
+    +createdAt: DateTime
+}
+
+' ---------- Biller Catalog ----------
+class Biller {
+    +id: int
+    +name: string
+    +isActive: boolean
+}
+
+class BillerService {
+    +id: int
+    +name: string
+    +minAmount: Decimal
+    +maxAmount: Decimal
+    +requiredFields: string
+}
+
+' ---------- Payment Processing ----------
+class Payment {
+    +id: int
+    +reference: string
+    +billerReference: string
+    +idempotencyKey: string
+    +amount: Decimal
+    +fee: Decimal
+    +status: PaymentStatus
+    +createdAt: DateTime
+}
+
+class PaymentEvent {
+    +fromStatus: PaymentStatus
+    +toStatus: PaymentStatus
+    +reason: string
+    +createdAt: DateTime
+}
+
+' ---------- Fees and Commissions ----------
+interface FeeStrategy {
+    +calculate(amount: Decimal): Decimal
+}
+class FixedFee
+class PercentageFee
+class TieredFee
+
+class Promotion {
+    +id: int
+    +startDate: Date
+    +endDate: Date
+}
+
+class AgentCommission {
+    +id: int
+    +amount: Decimal
+}
+
+' ---------- Fraud Checks ----------
+interface FraudRule {
+    +check(payment: Payment): boolean
+}
+
+' ---------- Biller Integration ----------
+interface BillerAdapter {
+    +inquireBill(fields: Map): Decimal
+    +sendPayment(payment: Payment): BillerResponse
+    +queryStatus(reference: string): BillerResponse
+}
+class ElectroCoAdapter
+class AquaCoAdapter
+class TopUpNetAdapter
+
+class BillerResponse {
+    +outcome: string
+    +errorCode: string
+}
+
+' ---------- Notifications ----------
+class Notification {
+    +id: int
+    +message: string
+    +channel: NotificationChannel
+    +status: string
+    +retryCount: int
+}
+
+' ---------- Reconciliation ----------
+class ReconciliationReport {
+    +id: int
+    +runDate: Date
+}
+
+class ReconciliationDifference {
+    +id: int
+    +type: string
+    +notes: string
+}
+
+' ---------- Enums ----------
+enum VerificationLevel {
+    Basic
+    Verified
+}
+
+enum WalletOwnerType {
+    Customer
+    Agent
+    Platform
+}
+
+enum PaymentStatus {
+    Initiated
+    FundsHeld
+    SentToBiller
+    Completed
+    Failed
+    Unknown
+    Rejected
+    Refunded
+}
+
+enum LedgerEntryType {
+    TopUp
+    HoldPlaced
+    HoldReleased
+    HoldCaptured
+    Fee
+    Commission
+    Refund
+}
+
+enum HoldStatus {
+    Active
+    Released
+    Captured
+}
+
+enum NotificationChannel {
+    SMS
+    Email
+    Push
+}
+
+' ---------- Relationships ----------
+Customer "1" -- "1" Wallet : owns
+Agent "1" -- "1" Wallet : owns
+Wallet "1" -- "0..*" LedgerEntry : records
+Wallet "1" -- "0..*" Hold : contains
+
+Biller "1" -- "1..*" BillerService : offers
+Biller "1" -- "0..*" Promotion : has
+BillerService "1" --> "1" FeeStrategy : priced by
+
+Customer "1" -- "0..*" Payment : makes
+Agent "0..1" -- "0..*" Payment : pays on behalf of
+Payment "0..*" --> "1" BillerService : pays for
+Payment "1" -- "1..*" PaymentEvent : history
+Payment "1" -- "0..*" Hold : creates
+Payment "1" -- "0..*" LedgerEntry : generates
+Payment "1" -- "0..1" AgentCommission : generates
+Payment "1" -- "0..*" Notification : triggers
+Payment ..> FraudRule : checked by
+
+FeeStrategy <|.. FixedFee
+FeeStrategy <|.. PercentageFee
+FeeStrategy <|.. TieredFee
+
+BillerAdapter <|.. ElectroCoAdapter
+BillerAdapter <|.. AquaCoAdapter
+BillerAdapter <|.. TopUpNetAdapter
+BillerAdapter ..> BillerResponse : returns
+
+ReconciliationReport "1" *-- "0..*" ReconciliationDifference : contains
+ReconciliationDifference "0..*" -- "0..1" Payment : concerns
+
+Wallet --> WalletOwnerType
+
+@enduml
