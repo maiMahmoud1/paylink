@@ -32,9 +32,15 @@ jobs:
 
       - name: Run Lint
         run: ruff check app tests
+      - name: Debug Python Path
+        run: |
+              pwd
+              ls -la
+              python -c "import sys; print(sys.path)"
+              python -c "import os; print(os.listdir('.'))"  
 
       - name: Run tests
-        run: pytest
+        run: python -m pytest
 
       - name: Build Docker image
         run: docker build -t paylink-api .
