@@ -233,7 +233,7 @@ As an *admin*, I want to see daily totals so that I can follow the business.
 | **NFR-2** | Performance | At least **100 payments per second** sustained for **1 minute** against the mock billers | Load test (for example k6 or Locust) with the result report |
 | **NFR-3** | Resilience | When one biller is down, payments to **other billers still succeed** (success rate for other billers ≥ 99% during the outage) | Test that stops one mock biller (or makes it fail on purpose) while paying the others |
 | **NFR-4** | Modifiability | Adding a new biller changes **only** the Biller Integration module and configuration (**0 changes** in other modules) | Compare the changed files in the commit/pull request for a new mock biller |
-| **NFR-5** | Auditability | **100%** of money movements have an audit record with who, when and why | Test that compares the number of ledger entries with the number of audit records (must be equal) |
+| **NFR-5** | Auditability | **100%** of money movements have an audit record with who, when and why | For every money-movement ledger entry, verify that a corresponding audit record exists with who, when, what and why. Admin-only audit records are excluded from the count comparison |
 | **NFR-6** | Testability | At least **70% line coverage** on domain logic, measured in CI on every push | Coverage report in the GitHub Actions pipeline |
 
 ---
@@ -262,5 +262,5 @@ As an *admin*, I want to see daily totals so that I can follow the business.
 | 18 | Which notifications are mandatory, and what about the **Unknown** state? | SMS + push on **Completed** and **Failed** (FR-22). Email is optional. For Unknown, the customer sees an "in process" message in the API/app. | No |
 | 19 | Is **NetCo** (daily batch CSV) required? | **Optional** per the brief. Not in our minimum scope; the Biller Integration design will allow adding it later. | No |
 | 20 | Currency and decimals. | **EGP only**, 2 decimal places, exact decimal type. All amounts in the API are in pounds (ElectroCo v2 later uses piasters, handled only inside its adapter). | No |
-| 21 | Programming language and framework (not decided yet). | To be **declared by the team before the Phase 1 deadline** and then fixed (Java Spring Boot, .NET, NestJS or FastAPI). | Team decision |
+| 21 | Programming language and framework. | **Python with FastAPI** was selected by the team for the PayLink backend. The framework is fixed for Phase 1 and Phase 2. | No |
 | 22 | Who edits **fees and limits** (FR-24)? | Only the **Admin**. Changes apply to **new** payments only. Values are stored in configuration/database, not in code. | No |
