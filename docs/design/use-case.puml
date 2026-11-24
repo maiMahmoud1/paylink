@@ -1,0 +1,106 @@
+@startuml PayLink Use Case Diagram
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Customer" as C
+actor "Agent" as A
+actor "Support Employee" as S
+actor "Admin" as AD
+actor "Biller\n(ElectroCo, AquaCo,\nTopUpNet, NetCo)" as B <<external>>
+actor "SMS / Email /\nPush Provider" as N <<external>>
+
+' Agent is a special kind of customer-facing user
+A --|> C
+
+rectangle "PayLink System" {
+
+  package "Accounts and Wallet" {
+    usecase "Register account" as UC1
+    usecase "View balance and history" as UC2
+    usecase "Top up wallet" as UC3
+    usecase "Upgrade to verified" as UC4
+    usecase "Request refund of\ncompleted payment" as UC5
+  }
+
+  package "Biller Catalog" {
+    usecase "View billers and\nrequired fields" as UC6
+    usecase "Manage billers\n(add / edit / disable)" as UC7
+  }
+
+  package "Payment Processing" {
+    usecase "Run bill inquiry" as UC8
+    usecase "Pay a bill" as UC9
+    usecase "Pay on behalf\nof a customer" as UC10
+    usecase "Check fraud rules" as UC11
+    usecase "Calculate fee" as UC12
+    usecase "Hold funds" as UC13
+    usecase "Handle timeout\n(Unknown + retry)" as UC14
+    usecase "Release hold / refund\nfailed payment" as UC15
+    usecase "Receive biller callback" as UC16
+  }
+
+  package "Support and Admin" {
+    usecase "Search payment\nand view history" as UC17
+    usecase "Block / unblock account" as UC18
+    usecase "Approve refund" as UC19
+    usecase "Edit fees and limits" as UC20
+    usecase "View daily totals" as UC21
+    usecase "View audit log" as UC22
+  }
+
+  package "Notifications" {
+    usecase "Send notification\n(with retry)" as UC23
+  }
+
+  package "Reconciliation" {
+    usecase "Run reconciliation\nfrom settlement file" as UC24
+  }
+}
+
+' Customer
+C --> UC1
+C --> UC2
+C --> UC3
+C --> UC6
+C --> UC8
+C --> UC9
+C --> UC5
+
+' Agent
+A --> UC10
+A --> UC3
+
+' Support
+S --> UC17
+S --> UC18
+S --> UC19
+S --> UC4
+S --> UC24
+
+' Admin
+AD --> UC7
+AD --> UC20
+AD --> UC21
+AD --> UC22
+
+' External actors
+UC9 --> B
+UC8 --> B
+UC14 --> B
+B --> UC16
+B --> UC24 : settlement file
+UC23 --> N
+
+' Relationships between use cases
+UC10 ..> UC9 : <<include>>
+UC9 ..> UC8 : <<include>>
+UC9 ..> UC12 : <<include>>
+UC9 ..> UC11 : <<include>>
+UC9 ..> UC13 : <<include>>
+UC9 ..> UC23 : <<include>>
+UC14 ..> UC9 : <<extend>>
+UC15 ..> UC9 : <<extend>>
+UC16 ..> UC9 : <<extend>>
+UC19 ..> UC5 : <<extend>>
+
+@enduml

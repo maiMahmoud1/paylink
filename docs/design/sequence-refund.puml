@@ -1,0 +1,35 @@
+@startuml
+autonumber
+actor "Customer / Support" as Actor
+participant "Payment / Refund Svc" as RefundSvc
+participant "Wallet & Ledger" as Wallet
+participant "Audit Log" as Audit
+participant "Notification Svc" as Notif
+
+Note over RefundSvc : Check current payment state & ensure no prior refund exists
+Actor -> RefundSvc : Request refund / release hold (payment_ref, actor_id?, reason)
+RefundSvc -> RefundSvc : Validate payment exists, check state & duplicate refund
+
+alt Already Refunded
+  RefundSvc --> Actor : Rejected (payment already refunded)
+else Payment is in Unknown state
+  RefundSvc --> Actor : Rejected (no auto-refund while Unknown; await confirmation or reconciliation)
+else Payment is in Failed state (release hold)
+  RefundSvc -> Wallet : Record RELEASE_HOLD ledger entry (restore available, clear held)
+  RefundSvc -> RefundSvc : State -> Refunded
+  RefundSvc -> Audit : Log hold release & state transition (who, when, reason)
+  RefundSvc -> Notif : Send SMS & Push (payment failed & hold released)
+  RefundSvc --> Actor : Refunded (hold released to available balance)
+else Payment is Completed (support-approved refund)
+  RefundSvc -> RefundSvc : Verify support approval
+  alt Not approved by support
+    RefundSvc --> Actor : Rejected (support approval required)
+  else Approved by support
+    RefundSvc -> Wallet : Record REFUND ledger entry (credit available balance)
+    RefundSvc -> RefundSvc : State -> Refunded
+    RefundSvc -> Audit : Log approved refund (support actor, timestamp, reason)
+    RefundSvc -> Notif : Send SMS & Push (refund processed)
+    RefundSvc --> Actor : Refunded (amount credited to wallet)
+  end
+end
+@enduml
