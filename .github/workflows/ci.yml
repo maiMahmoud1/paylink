@@ -1,10 +1,5 @@
-name: PayLink CI
-
 on:
   push:
-    branches:
-      - main
-      - member-4-devops
   pull_request:
     branches:
       - main
